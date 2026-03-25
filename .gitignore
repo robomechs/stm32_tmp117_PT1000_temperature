@@ -1,0 +1,20 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# STM32CubeIDE build outputs
+TMP117_stm32f103c8/Debug/
+TMP117_stm32f103c8/Release/
+
+# KiCad local history, backups and machine-specific files
+TMP117_PCB/tmp117/.history/
+TMP117_PCB/tmp117/*-backups/
+TMP117_PCB/tmp117/fp-info-cache
+TMP117_PCB/tmp117/*.kicad_prl
+TMP117_PCB/tmp117/*.lck

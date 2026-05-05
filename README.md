@@ -39,6 +39,45 @@ On the PC side, the included viewer can:
 
 - **STM32F103C8T6 BluePill**
 
+## Measurement Ranges
+
+Reference specifications used here:
+
+- [PT106052 / SA10200542 PT1000 listing](https://www.tme.com/ca/en/details/pt106052/temp-sensors-resistance-thermometers/cyntec-co-ltd/sa10200542/)
+- [TI TMP117 product page](https://www.ti.com/product/TMP117)
+
+### PT1000 channel
+
+The PT1000 element used for this project is PT106052 / SA10200542 style: `Pt1000`, class B `0.12 %`, `3850 ppm/C`, with a specified operating range of approximately **-50 C to +500 C**.
+
+This is the intended practical measurement range for the PT1000 channel.
+
+The firmware uses a simple linear PT1000 approximation:
+
+```text
+R(T) = R0 * (1 + 0.00385 * T)
+```
+
+So the conversion is intentionally simple and integer-friendly for STM32F103. For better absolute accuracy across the full `-50...500 C` span, the next improvement would be a calibrated table or Callendar-Van Dusen conversion.
+
+With the current divider value, the PT1000 range maps well into the 12-bit ADC input range:
+
+| Temperature | Approx. PT1000 resistance | Approx. ADC code | Approx. ADC voltage at 3.3 V |
+| --- | ---: | ---: | ---: |
+| `-50 C` | `807.5 Ohm` | `2749` | `2.22 V` |
+| `0 C` | `1000.0 Ohm` | `2550` | `2.06 V` |
+| `25 C` | `1096.3 Ohm` | `2460` | `1.98 V` |
+| `100 C` | `1385.0 Ohm` | `2226` | `1.79 V` |
+| `500 C` | `2925.0 Ohm` | `1477` | `1.19 V` |
+
+The ADC itself has much wider mathematical headroom, but the useful documented PT1000 range should be treated as **-50 C to +500 C** unless the sensor, mounting, wiring, and calibration are validated outside that range.
+
+### TMP117 channel
+
+The TMP117 channel is intended for the TMP117 operating range: **-55 C to +150 C**.
+
+In the current firmware, TMP117 is polled at `20 Hz`, but the default USB stream sends PT1000 only. TMP117 output can be enabled in firmware with `USB_STREAM_MODE_TMP117` or `USB_STREAM_MODE_BOTH`.
+
 ### PT1000 connection
 
 The PT1000 is connected as a simple divider from `3.3 V`:
@@ -50,6 +89,16 @@ The PT1000 is connected as a simple divider from `3.3 V`:
 Divider:
 
 `3.3V -> PT1000 -> PA0 -> 1.65k -> GND`
+
+The `1.65 kOhm` resistor was chosen to place the expected `-50...500 C` PT1000 resistance range comfortably inside the ADC range while keeping useful sensitivity over the whole span. It is not a common single resistor value, so it can be made from **two 3.3 kOhm resistors in parallel**:
+
+```text
+3.3k || 3.3k = 1.65k
+```
+
+The divider resistor is used directly by the firmware conversion. In [main.c](TMP117_stm32f103c8/Core/Src/main.c), the value is defined as `PT1000_BOTTOM_RESISTOR_MOHM`. It is stored in milliohms; the current nominal value is `1650000`, meaning `1650.000 Ohm`.
+
+If better absolute accuracy is needed, measure the actual parallel resistance and put that value into `PT1000_BOTTOM_RESISTOR_MOHM` in milliohms.
 
 ### TMP117 connection
 
@@ -286,3 +335,25 @@ Typical workflow:
 - The repository ignores generated build outputs, Python cache files, KiCad local history, and KiCad backup archives.
 - The current default USB stream is PT1000-only, which keeps the USB output simple for the viewer and logging workflow.
 - TMP117 acquisition is still active in firmware, so enabling dual-sensor output later is straightforward.
+
+## PT1000 Wiring Quick Reference
+
+Use this connection for the PT1000 divider:
+
+```text
+BluePill 3V3 -> PT1000 -> PA0 / ADC1_IN0 -> 1.65k -> GND
+```
+
+The bottom resistor may be either:
+
+```text
+single 1.65k resistor
+```
+
+or:
+
+```text
+two 3.3k resistors in parallel
+```
+
+Keep the ADC node connected only to `PA0`, the PT1000, and the bottom resistor. Do not connect the divider to `5 V`; the firmware assumes `3.3 V` ADC reference behavior.

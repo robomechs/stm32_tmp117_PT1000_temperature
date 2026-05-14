@@ -100,6 +100,10 @@ The divider resistor is used directly by the firmware conversion. In [main.c](TM
 
 If better absolute accuracy is needed, measure the actual parallel resistance and put that value into `PT1000_BOTTOM_RESISTOR_MOHM` in milliohms.
 
+If the PT1000 and the `1.65 kOhm` resistor are physically swapped during assembly, the firmware can be switched without rewiring. Set `PT1000_DIVIDER_PT1000_ON_TOP` to `0` in [main.c](TMP117_stm32f103c8/Core/Src/main.c). Default is `1`, meaning `3.3V -> PT1000 -> PA0 -> 1.65k -> GND`.
+
+Swapping the divider mostly reverses the ADC slope. Sensitivity and self-heating are nearly the same because the same two resistors are still in series. With the correct define, measurements remain valid; with the wrong define, the temperature will be badly wrong.
+
 ### TMP117 connection
 
 - `PB6` -> `I2C1_SCL`
@@ -342,6 +346,24 @@ Use this connection for the PT1000 divider:
 
 ```text
 BluePill 3V3 -> PT1000 -> PA0 / ADC1_IN0 -> 1.65k -> GND
+```
+
+This is the default firmware setting:
+
+```c
+#define PT1000_DIVIDER_PT1000_ON_TOP 1U
+```
+
+If the parts are swapped:
+
+```text
+BluePill 3V3 -> 1.65k -> PA0 / ADC1_IN0 -> PT1000 -> GND
+```
+
+use this firmware setting:
+
+```c
+#define PT1000_DIVIDER_PT1000_ON_TOP 0U
 ```
 
 The bottom resistor may be either:

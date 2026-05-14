@@ -57,6 +57,7 @@
 #define PT1000_OUTPUT_TICKS                 (PT1000_FILTER_SAMPLE_RATE_HZ / PT1000_USB_OUTPUT_RATE_HZ)
 #define PT1000_FILTER_ALPHA_Q15             1937U /* fc ~= 10 Hz at fs = 1 kHz */
 #define PT1000_ADC_FULL_SCALE_COUNTS        4095U
+#define PT1000_DIVIDER_PT1000_ON_TOP        1U /* 1: 3V3-PT1000-A0-1.65k-GND, 0: 3V3-1.65k-A0-PT1000-GND */
 #define PT1000_BOTTOM_RESISTOR_MOHM         1650000LL
 #define PT1000_REFERENCE_RESISTANCE_MOHM    1000000LL
 #define PT1000_ALPHA_PPM_PER_C              3850LL
@@ -466,11 +467,16 @@ static int32_t PT1000_AdcToMilliC(uint16_t adc_counts)
   int64_t milli_c;
 
   /*
-   * Divider:
+   * Divider, default:
    * 3V3 --- PT1000 --- ADC input --- 1.65k --- GND
    *
    * Using Vref = VCC cancels the supply in the resistance calculation:
    * Rpt = Rbottom * (4095 - adc) / adc
+   *
+   * If the divider is physically swapped, set PT1000_DIVIDER_PT1000_ON_TOP
+   * to 0 in the private defines above:
+   * 3V3 --- 1.65k --- ADC input --- PT1000 --- GND
+   * Rpt = Rtop * adc / (4095 - adc)
    *
    * Temperature uses the PT1000 alpha approximation:
    * R(T) = R0 * (1 + 0.00385 * T)
@@ -484,9 +490,16 @@ static int32_t PT1000_AdcToMilliC(uint16_t adc_counts)
     adc_counts_u32 = PT1000_ADC_FULL_SCALE_COUNTS - 1U;
   }
 
+#if PT1000_DIVIDER_PT1000_ON_TOP
   pt1000_resistance_mohm =
       (PT1000_BOTTOM_RESISTOR_MOHM * (PT1000_ADC_FULL_SCALE_COUNTS - adc_counts_u32) + (adc_counts_u32 / 2U)) /
       adc_counts_u32;
+#else
+  pt1000_resistance_mohm =
+      (PT1000_BOTTOM_RESISTOR_MOHM * adc_counts_u32 +
+       ((PT1000_ADC_FULL_SCALE_COUNTS - adc_counts_u32) / 2U)) /
+      (PT1000_ADC_FULL_SCALE_COUNTS - adc_counts_u32);
+#endif
   milli_c = ((pt1000_resistance_mohm - PT1000_REFERENCE_RESISTANCE_MOHM) * 1000LL) /
             PT1000_ALPHA_PPM_PER_C;
 
